@@ -4,12 +4,13 @@
 import React, { useState } from 'react';
 import { X, Minus, Plus, Copy, Users } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { validateInput } from '../../utils/profanityFilter';
 
 // =========================================================================
 // 2. [CREATE TEAM MODAL] — 팀 생성 모달
 // =========================================================================
 const CreateTeamModal = ({ onClose, onCreate, showToast, existingName }) => {
-  const [step, setStep] = useState('form'); // 'form' | 'result'
+  const [step, setStep] = useState('form');
   const [userName, setUserName] = useState(existingName || '');
   const [teamName, setTeamName] = useState('');
   const [maxMembers, setMaxMembers] = useState(5);
@@ -17,13 +18,26 @@ const CreateTeamModal = ({ onClose, onCreate, showToast, existingName }) => {
   const [resultData, setResultData] = useState(null);
 
   const MIN_MEMBERS = 2;
-  const MAX_MEMBERS = 10; // 무료 기준
+  const MAX_MEMBERS = 10;
 
   // =========================================================================
   // 3. [HANDLERS]
   // =========================================================================
   const handleSubmit = async () => {
-    if (!userName.trim() || !teamName.trim()) return;
+    // 이름 검증
+    const nameCheck = validateInput(userName, 20, '이름');
+    if (!nameCheck.valid) {
+      showToast(nameCheck.message);
+      return;
+    }
+
+    // 팀 이름 검증
+    const teamCheck = validateInput(teamName, 20, '팀 이름');
+    if (!teamCheck.valid) {
+      showToast(teamCheck.message);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const result = await onCreate(teamName, maxMembers, userName);
@@ -82,28 +96,27 @@ const CreateTeamModal = ({ onClose, onCreate, showToast, existingName }) => {
 
           <div className="p-5 space-y-5">
             <div>
-              <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block">내 이름 (실명)</label>
+              <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block">내 이름</label>
               <input
                 type="text"
                 value={userName}
-                onChange={e => setUserName(e.target.value)}
-                placeholder="홍길동"
-                maxLength={10}
+                onChange={e => setUserName(e.target.value.slice(0, 20))}
+                placeholder="실명으로 입력해주세요"
+                maxLength={20}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#E8668A] focus:ring-2 focus:ring-[#E8668A]/20 transition-all"
               />
             </div>
 
             <div>
-              <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block">팀 이름 (20자 이내)</label>
+              <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block">팀 이름</label>
               <input
                 type="text"
                 value={teamName}
                 onChange={e => setTeamName(e.target.value.slice(0, 20))}
-                placeholder="마케팅팀 워크숍"
+                placeholder="팀 이름을 입력해주세요"
                 maxLength={20}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-[14px] font-medium focus:outline-none focus:border-[#E8668A] focus:ring-2 focus:ring-[#E8668A]/20 transition-all"
               />
-              <span className="text-[10px] text-gray-400 mt-1 block text-right">{teamName.length}/20</span>
             </div>
 
             <div>
@@ -150,7 +163,7 @@ const CreateTeamModal = ({ onClose, onCreate, showToast, existingName }) => {
   }
 
   // =========================================================================
-  // 5. [RENDER — RESULT STEP] — 초대코드 + QR 표시
+  // 5. [RENDER — RESULT STEP]
   // =========================================================================
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">

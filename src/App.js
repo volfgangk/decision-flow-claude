@@ -32,11 +32,9 @@ export default function App() {
   const team = useTeam(userId);
   const isAdmin = new URLSearchParams(window.location.search).get('token') === 'admin';
 
-  // 🔥 Phase B: 모달 및 팀 상세 상태
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [showJoinTeam, setShowJoinTeam] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
-  const [userName, setUserName] = useState('');
 
   // =========================================================================
   // 3. [AUTH LOADING]
@@ -57,7 +55,7 @@ export default function App() {
   }
 
   // =========================================================================
-  // 4. [TEAM DETAIL HANDLER]
+  // 4. [HANDLERS]
   // =========================================================================
   const handleClickTeam = (teamId) => {
     setSelectedTeamId(teamId);
@@ -117,6 +115,10 @@ export default function App() {
             votedIds={engine.votedIds || []}
             onSelectId={id => { engine.setSelectedId(id); engine.setView('vote'); }}
             onDelete={engine.handleDeleteDecision}
+            showToast={engine.showToast}
+            userName={team.userName}
+            isPremium={team.isPremium}
+            onUpdateName={team.updateUserName}
           />
         )}
 
@@ -151,7 +153,7 @@ export default function App() {
             onClose={() => setShowCreateTeam(false)}
             onCreate={team.createTeam}
             showToast={engine.showToast}
-            existingName={userName}
+            existingName={team.userName}
           />
         )}
 
@@ -160,6 +162,7 @@ export default function App() {
             onClose={() => setShowJoinTeam(false)}
             onJoin={team.joinTeam}
             showToast={engine.showToast}
+            existingName={team.userName}
           />
         )}
       </div>
