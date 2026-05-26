@@ -27,7 +27,7 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
     () => decision.options.filter(o => !o.id.includes('-')),
     [decision.options]
   );
-  const showStats = isAdmin || hasVoted;
+  const showStats = hasVoted;
 
   const getPercentage = useCallback(
     (count) => !decision.voters ? '0%' : ((count / decision.voters) * 100).toFixed(1) + '%',
@@ -111,13 +111,13 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
               <div key={root.id} className="flex flex-col gap-1.5 bg-gray-200/40 border border-gray-200/60 rounded-[32px] p-3 transition-all">
                 {isLeaf ? (
                   <button
-                    disabled={hasVoted || isAdmin}
+                    disabled={hasVoted}
                     onClick={() => setSelectedId(root.id)}
                     className={`w-full p-4 rounded-2xl text-left transition-all border-2 flex justify-between items-center ${
                       isSelected ? 'bg-white border-[#B6FF33] shadow-[0_10px_20px_-5px_rgba(182,255,51,0.3)]'
                       : isWinner ? `${DESIGN_TOKENS.statsBg} ${DESIGN_TOKENS.statsBorder} shadow-sm`
                       : 'bg-white border-gray-100 shadow-sm'
-                    } ${isAdmin ? 'cursor-default' : ''}`}
+                    } ${''}`}
                   >
                     <div className="flex gap-2 flex-1 mr-2 overflow-hidden items-center">
                       <span className="text-[15px] font-black text-[#E8668A] shrink-0">{root.id}.</span>
@@ -153,13 +153,13 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
                     <div key={l1.id} className="space-y-1.5">
                       {isL1Leaf ? (
                         <button
-                          disabled={hasVoted || isAdmin}
+                          disabled={hasVoted}
                           onClick={() => setSelectedId(l1.id)}
                           className={`w-full p-3.5 rounded-2xl text-left transition-all flex items-center justify-between border-2 ${
                             isL1Sel ? 'bg-white border-[#B6FF33] shadow-[0_10px_20px_-5px_rgba(182,255,51,0.3)]'
                             : isL1Win ? `${DESIGN_TOKENS.statsBg} ${DESIGN_TOKENS.statsBorder} shadow-sm`
                             : 'bg-white border-gray-100 shadow-sm'
-                          } ${isAdmin ? 'cursor-default' : ''}`}
+                          } ${''}`}
                         >
                           <div className="flex items-center gap-3 flex-1 mr-2 overflow-hidden">
                             <CornerDownRight className="w-4 h-4 text-gray-300 shrink-0" />
@@ -193,13 +193,13 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
                         return (
                           <button
                             key={l2.id}
-                            disabled={hasVoted || isAdmin}
+                            disabled={hasVoted}
                             onClick={() => setSelectedId(l2.id)}
                             className={`p-3 rounded-xl text-left transition-all flex items-center justify-between border-2 ${
                               isL2Sel ? 'bg-white border-[#B6FF33] shadow-[0_10px_20px_-5px_rgba(182,255,51,0.3)]'
                               : isL2Win ? `${DESIGN_TOKENS.statsBg} ${DESIGN_TOKENS.statsBorder} shadow-sm`
                               : 'bg-white border-gray-100 shadow-sm'
-                            } ${isAdmin ? 'cursor-default' : ''}`}
+                            } ${''}`}
                             style={{ width: 'calc(100% - 24px)', marginLeft: '24px' }}
                           >
                             <div className="flex items-center gap-3 flex-1 mr-2 overflow-hidden">
@@ -230,46 +230,11 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
           })}
         </div>
 
-        {/* 관리자 패널 */}
-        {isAdmin && (
-          <div className="mt-8 bg-white border-2 border-gray-900 rounded-2xl p-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.1)]">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-              <h3 className="font-black text-gray-900 flex items-center gap-2 text-sm">
-                <Users className="w-4 h-4" /> 실시간 참여자 감찰 명단
-              </h3>
-              <span className="bg-gray-900 text-white text-[10px] px-2.5 py-1 rounded-full font-bold">
-                {decision.voteLogs?.length || 0}명
-              </span>
-            </div>
-            <div className="space-y-2">
-              {decision.voteLogs?.length > 0
-                ? decision.voteLogs.map((log, i) => (
-                    <div key={i} className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-xl p-3">
-                      <div className="flex flex-col gap-0.5">
-                      <span className="font-bold text-gray-900 text-[13px]">
-  {log.persona?.emoji || '👤'} {log.userName}
-</span>
-                        <span className="font-medium text-gray-500 text-[11px] truncate max-w-[200px]">
-                          선택: {decision.options.find(o => o.id === log.optionId)?.text || log.optionId}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => window.confirm(`${log.userName}님의 표를 무효화하시겠습니까?`) && onKick(decision.id, log.logId, log.optionId)}
-                        className="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))
-                : <div className="text-center py-6 text-gray-400 font-medium text-xs">아직 참여자가 없습니다.</div>
-              }
-            </div>
-          </div>
-        )}
+
       </main>
 
       <div className={`absolute bottom-[76px] left-0 w-full px-6 pb-6 bg-gradient-to-t from-white via-white/90 to-transparent z-10 ${isAdmin ? 'pt-6' : 'pt-10'}`}>
-      {isAdmin ? (
+      {(isAdmin && hasVoted) ? (
   <div className="space-y-2">
     {decision.earlyCloseRate && decision.voters > 0 && (
       <div className={`rounded-2xl p-3 text-center border ${
