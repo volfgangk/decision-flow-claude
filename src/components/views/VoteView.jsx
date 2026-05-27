@@ -13,7 +13,7 @@ import { DESIGN_TOKENS } from '../../constants/colors';
 import TreeEngine from '../../utils/treeEngine';
 import GuestModal from '../common/GuestModal';
 
-const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmin, onKick }) => {
+const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmin, onKick, teamMemberCount }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [showGuest, setShowGuest]   = useState(!isAdmin && !hasVoted);
   const [userName, setUserName]   = useState(isAdmin ? '방장' : '');
@@ -238,11 +238,11 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
   <div className="space-y-2">
     {decision.earlyCloseRate && decision.voters > 0 && (
       <div className={`rounded-2xl p-3 text-center border ${
-        decision.voters >= Math.ceil(decision.earlyCloseRate / 10)
+        decision.voters >= Math.ceil(teamMemberCount * decision.earlyCloseRate / 100)
           ? 'bg-[#FAFFEB] border-[#B6FF33]/60'
           : 'bg-gray-50 border-gray-200'
       }`}>
-        {decision.voters >= Math.ceil(decision.earlyCloseRate / 10) ? (
+        {decision.voters >= Math.ceil(teamMemberCount * decision.earlyCloseRate / 100) ? (
           <>
             <p className="text-[12px] font-black text-[#8CB82D]">
               🎯 목표 투표율 {decision.earlyCloseRate}% 달성!
@@ -259,8 +259,17 @@ const VoteView = ({ decision, setView, onVoteSubmit, hasVoted, showToast, isAdmi
       </div>
     )}
     <button
-      onClick={() => setView('minimap')}
-      className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white rounded-2xl py-4 font-black shadow-xl active:scale-95 transition-all text-lg"
+      onClick={() => {
+        if (window.confirm('정말 투표를 마감하시겠습니까?\n마감 후에는 더 이상 투표할 수 없습니다.')) {
+          setView('minimap');
+        }
+      }}
+      disabled={teamMemberCount > 0 && decision.voters < Math.ceil(teamMemberCount * decision.earlyCloseRate / 100)}
+      className={`w-full rounded-2xl py-4 font-black shadow-xl transition-all text-lg ${
+        teamMemberCount > 0 && decision.voters < Math.ceil(teamMemberCount * decision.earlyCloseRate / 100)
+          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          : 'bg-gradient-to-r from-red-600 to-red-500 text-white active:scale-95'
+      }`}
     >
       투표 강제 조기 마감하기
     </button>

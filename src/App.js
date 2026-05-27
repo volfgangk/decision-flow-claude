@@ -339,7 +339,7 @@ export default function App() {
     engine.setView('create');
   };
 
-  const isAgendaAdmin = currentDecision?.creator_id === userId || isAdmin;
+  const isAgendaAdmin = currentDecision?.isMock || currentDecision?.creator_id === userId || isAdmin;
 
   // =========================================================================
   // 16. [RENDER]
@@ -379,14 +379,20 @@ export default function App() {
 
         {engine.view === 'vote' && currentDecision && !decisionLoading && (
           <VoteView
-            decision={currentDecision}
-            setView={engine.setView}
-            onVoteSubmit={handleVoteSubmit}
-            hasVoted={currentHasVoted}
-            showToast={engine.showToast}
-            isAdmin={isAgendaAdmin}
-            onKick={handleKick}
-          />
+          decision={currentDecision}
+          setView={engine.setView}
+          onVoteSubmit={handleVoteSubmit}
+          hasVoted={currentHasVoted}
+          showToast={engine.showToast}
+          isAdmin={isAgendaAdmin}
+          onKick={handleKick}
+          teamMemberCount={
+            currentDecision?.isMock
+              ? (currentDecision?.max_members || 2)
+              : ([...team.myCreatedTeams, ...team.myJoinedTeams]
+                  .find(t => t.id === currentDecision?.team_id)?.max_members || 0)
+          }
+        />
         )}
 
         {engine.view === 'vote' && decisionLoading && (
