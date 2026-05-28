@@ -370,6 +370,7 @@ export default function App() {
             onOpenJoinTeam={() => setShowJoinTeam(true)}
             onClickTeam={handleClickTeam}
             firebaseAgendas={agenda.firebaseAgendas}
+            userId={userId}
           />
         )}
 
