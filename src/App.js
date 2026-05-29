@@ -410,7 +410,7 @@ export default function App() {
           <VisualMapView decision={currentDecision} setView={engine.setView} />
         )}
 
-        {engine.view === 'myroom' && (
+{engine.view === 'myroom' && (
           <MyRoomView
             setView={engine.setView}
             decisions={agenda.allDecisions}
@@ -421,6 +421,12 @@ export default function App() {
             userName={team.userName}
             isPremium={team.isPremium}
             onUpdateName={team.updateUserName}
+            userId={userId}
+            myCreatedTeams={team.myCreatedTeams}
+            myJoinedTeams={team.myJoinedTeams}
+            onClickTeam={handleClickTeam}
+            onDeleteTeam={team.deleteTeam}
+            onLeaveTeam={team.leaveTeam}
           />
         )}
 

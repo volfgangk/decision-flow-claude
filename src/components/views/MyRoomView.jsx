@@ -1,108 +1,240 @@
 // =========================================================================
 // 1. [IMPORTS]
 // =========================================================================
-import React, { useMemo, useState } from 'react';
-import { ChevronLeft, Trophy, FileText, Users, CheckCircle2, Clock, X, Edit3, Save, AlertCircle } from 'lucide-react';
-import { validateInput } from '../../utils/profanityFilter';
+import React, { useState, useMemo } from 'react';
+import {
+  ChevronLeft, FileText, Users, CheckCircle2,
+  Clock, Trash2, LogOut, RefreshCw, CornerDownRight
+} from 'lucide-react';
+import TreeEngine from '../../utils/treeEngine';
 
 // =========================================================================
-// 2. [MY ROOM VIEW] — 마이룸 화면
+// 2. [AGENDA TILE] — 안건 타일 (리스트용)
 // =========================================================================
-const MyRoomView = ({ setView, decisions, votedIds, onSelectId, onDelete, showToast, userName, isPremium, onUpdateName }) => {
-  const MOCK_IDS = [10001, 10002, 20001];
+const AgendaTile = ({ agenda, onClick, onDelete, canDelete, isCompleted }) => {
+  const optionCount = agenda.options?.length || 0;
 
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [newName, setNewName] = useState(userName || '');
-  const [isSaving, setIsSaving] = useState(false);
+  // 마감 기한 표시
+  const deadlineDisplay = isCompleted
+    ? (agenda.deadline?.toDate
+        ? agenda.deadline.toDate().toISOString().slice(0, 10)
+        : '마감됨')
+    : (agenda.dDay || 'D-Day');
+
+  return (
+    <div onClick={onClick}
+      className={`border rounded-xl p-3 transition-all cursor-pointer active:scale-[0.99] relative ${
+        isCompleted
+          ? 'bg-gray-50 border-gray-200 opacity-70'
+          : 'bg-white border-gray-100 shadow-sm hover:shadow-md'
+      }`}
+    >
+      {/* 삭제 버튼 */}
+      {canDelete && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            if (window.confirm('정말 삭제할까요? 이 안건의 모든 투표 기록도 함께 삭제됩니다.')) {
+              onDelete(agenda.id);
+            }
+          }}
+          className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {/* 상단 뱃지 */}
+      <div className="flex items-center gap-1.5 mb-1.5 pr-6">
+        <span className="text-[13px]">📋</span>
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+          isCompleted ? 'bg-gray-100 text-gray-400' : 'bg-[#FFF0F3] text-[#E8668A]'
+        }`}>
+          {deadlineDisplay}
+        </span>
+        <span className="text-[10px] font-bold text-gray-400 flex items-center gap-0.5">
+          <Users className="w-3 h-3" /> {agenda.voters || 0}
+        </span>
+        <span className="text-[10px] font-bold text-gray-400">
+          {optionCount}개
+        </span>
+      </div>
+
+      {/* 제목 */}
+      <h3 className={`text-[13px] font-black leading-tight break-keep ${
+        isCompleted ? 'text-gray-400' : 'text-gray-800'
+      }`}>
+        {agenda.title}
+      </h3>
+    </div>
+  );
+};
+
+// =========================================================================
+// 3. [MOST VOTED OPTION] — 최다 투표 선택지 표시
+// =========================================================================
+const MostVotedOption = ({ agendas }) => {
+  // 진행 중인 안건 중 투표가 있는 것에서 최다 선택지 찾기
+  const bestOption = useMemo(() => {
+    let best = null;
+    let bestVotes = 0;
+    let bestAgendaTitle = '';
+
+    agendas.forEach(a => {
+      if (a.status === '마감' || !a.options) return;
+      const leaves = a.options.filter(
+        o => !a.options.some(sub => sub.id.startsWith(o.id + '-'))
+      );
+      leaves.forEach(leaf => {
+        if ((leaf.voteCount || 0) > bestVotes) {
+          bestVotes = leaf.voteCount;
+          best = leaf;
+          bestAgendaTitle = a.title;
+        }
+      });
+    });
+
+    if (!best || bestVotes === 0) return null;
+
+    // depth 경로 구성
+    const parts = best.id.split('-');
+    const path = [];
+    let current = '';
+    parts.forEach(part => {
+      current = current ? `${current}-${part}` : part;
+      const found = agendas.flatMap(a => a.options).find(o => o.id === current);
+      if (found) path.push(found);
+    });
+
+    return { path, agendaTitle: bestAgendaTitle, votes: bestVotes };
+  }, [agendas]);
+
+  if (!bestOption) return null;
+
+  return (
+    <div className="mt-3 bg-[#F8FAFF] border border-[#D2DFEE] rounded-xl p-3">
+      <p className="text-[9px] font-black text-[#4A648A] uppercase tracking-wider mb-2">최다 투표 선택지</p>
+      <p className="text-[10px] font-bold text-gray-400 mb-1.5 truncate">{bestOption.agendaTitle}</p>
+      <div className="space-y-1">
+        {bestOption.path.map((node, i) => (
+          <div key={node.id} className="flex items-center gap-1.5" style={{ paddingLeft: `${i * 12}px` }}>
+            {i > 0 && <CornerDownRight className="w-3 h-3 text-gray-300 shrink-0" />}
+            <span className={`text-[11px] font-bold ${
+              i === bestOption.path.length - 1 ? 'text-[#E8668A]' : 'text-gray-500'
+            }`}>
+              {node.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// =========================================================================
+// 4. [TEAM TILE] — 팀 타일
+// =========================================================================
+const TeamTile = ({ team, isOwner, onClick, onDelete, onLeave, showToast }) => (
+  <div onClick={onClick}
+    className={`border rounded-xl p-3 transition-all cursor-pointer active:scale-[0.99] relative ${
+      isOwner ? 'bg-white border-[#FCD9E1]' : 'bg-white border-[#C6E6C6]'
+    }`}
+  >
+    {/* 삭제/나가기 버튼 */}
+    <button
+      onClick={e => {
+        e.stopPropagation();
+        if (isOwner) {
+          if (window.confirm(`"${team.team_name}" 팀을 삭제하시겠습니까?`)) onDelete(team.id);
+        } else {
+          if (window.confirm(`"${team.team_name}" 팀에서 탈퇴하시겠습니까?`)) onLeave(team.id);
+        }
+      }}
+      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-300 hover:text-red-400 transition-colors"
+    >
+      {isOwner ? <Trash2 className="w-3.5 h-3.5" /> : <LogOut className="w-3.5 h-3.5" />}
+    </button>
+
+    {/* 뱃지 */}
+    <div className="flex items-center gap-1.5 mb-1.5 pr-6">
+      <span className="text-[13px]">📋</span>
+      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+        isOwner ? 'bg-[#FFF0F3] text-[#C95374]' : 'bg-[#EEF3FF] text-[#4A6FA5]'
+      }`}>
+        {isOwner ? '내 팀' : '참여 팀'}
+      </span>
+      <span className="text-[10px] font-bold text-gray-400 flex items-center gap-0.5">
+        <Users className="w-3 h-3" /> {team.member_ids?.length || 1}명
+      </span>
+    </div>
+
+    {/* 팀명 */}
+    <h3 className="text-[13px] font-black text-gray-800 truncate">{team.team_name}</h3>
+  </div>
+);
+
+// =========================================================================
+// 5. [MY ROOM VIEW] — 마이룸 화면 (PDF 슬라이드 10~13)
+// =========================================================================
+const MyRoomView = ({
+  setView, decisions, votedIds, onSelectId, onDelete,
+  showToast, userName, isPremium, onUpdateName,
+  userId, myCreatedTeams, myJoinedTeams,
+  onClickTeam, onDeleteTeam, onLeaveTeam,
+}) => {
+  const [activeTab, setActiveTab] = useState(0);
+  const tabs = ['내가 만든 안건', '내가 참여한 안건', '완료된 안건', 'Team'];
 
   // =========================================================================
-  // 3. [STATS] — 통계 계산
+  // 6. [DATA CLASSIFICATION]
   // =========================================================================
-  const stats = useMemo(() => {
-    const myDecisions = decisions.filter(d => d.id !== 20001);
-    const participated = decisions.filter(d => votedIds.includes(d.id));
-    const closed = myDecisions.filter(d =>
-      d.status === '마감' || (d.deadline && new Date(d.deadline) <= new Date())
-    );
-    const resolved = closed.filter(d => d.voters >= 2);
-    const resolutionRate = closed.length > 0
-      ? Math.round((resolved.length / closed.length) * 100)
-      : 0;
+  const myCreatedAgendas = useMemo(() =>
+    decisions.filter(d => d.status !== '마감' && (d.isMock || d.creator_id === userId))
+      .sort((a, b) => {
+        const aTime = a.deadline?.toDate ? a.deadline.toDate().getTime() : Infinity;
+        const bTime = b.deadline?.toDate ? b.deadline.toDate().getTime() : Infinity;
+        return aTime - bTime;
+      }),
+    [decisions, userId]
+  );
 
-    return {
-      totalCreated: myDecisions.length,
-      totalParticipated: participated.length,
-      totalClosed: closed.length,
-      resolutionRate,
-    };
-  }, [decisions, votedIds]);
+  const myJoinedAgendas = useMemo(() =>
+    decisions.filter(d => d.status !== '마감' && !d.isMock && d.creator_id !== userId)
+      .sort((a, b) => {
+        const aTime = a.deadline?.toDate ? a.deadline.toDate().getTime() : Infinity;
+        const bTime = b.deadline?.toDate ? b.deadline.toDate().getTime() : Infinity;
+        return aTime - bTime;
+      }),
+    [decisions, userId]
+  );
 
-  // =========================================================================
-  // 4. [NAME CHANGE LOGIC] — 이름 변경 가능 여부 판단
-  // =========================================================================
-  const nameChangeCheck = useMemo(() => {
-    if (isPremium) {
-      return { canChange: true, reason: null };
-    }
+  const completedAgendas = useMemo(() =>
+    decisions.filter(d => d.status === '마감')
+      .sort((a, b) => {
+        const aTime = a.deadline?.toDate ? a.deadline.toDate().getTime() : 0;
+        const bTime = b.deadline?.toDate ? b.deadline.toDate().getTime() : 0;
+        return bTime - aTime;
+      }),
+    [decisions]
+  );
 
-    const myDecisions = decisions.filter(d => d.id !== 20001 && !MOCK_IDS.includes(d.id));
-    const votedDecisions = decisions.filter(d => votedIds.includes(d.id));
+  // 서머리 숫자
+  const summaryData = [
+    { icon: FileText, label: '만든 안건', count: myCreatedAgendas.length, tab: 0 },
+    { icon: Users, label: '참여한 안건', count: myJoinedAgendas.length, tab: 1 },
+    { icon: CheckCircle2, label: '완료된 안건', count: completedAgendas.length, tab: 2 },
+    { icon: Users, label: 'Team', count: (myCreatedTeams?.length || 0) + (myJoinedTeams?.length || 0), tab: 3 },
+  ];
 
-    const hasActiveCreated = myDecisions.some(d =>
-      d.status !== '마감' && !(d.deadline && new Date(d.deadline) <= new Date())
-    );
-
-    const hasActiveVoted = votedDecisions.some(d =>
-      d.status !== '마감' && !(d.deadline && new Date(d.deadline) <= new Date())
-    );
-
-    if (hasActiveCreated || hasActiveVoted) {
-      return {
-        canChange: false,
-        reason: '진행 중인 안건이 모두 완료된 후 변경할 수 있어요',
-      };
-    }
-
-    return { canChange: true, reason: null };
-  }, [decisions, votedIds, isPremium]);
-
-  // =========================================================================
-  // 5. [HANDLE NAME SAVE]
-  // =========================================================================
-  const handleNameSave = async () => {
-    const check = validateInput(newName, 20, '이름');
-    if (!check.valid) {
-      showToast(check.message);
-      return;
-    }
-
-    if (newName.trim() === userName) {
-      setIsEditingName(false);
-      return;
-    }
-
-    setIsSaving(true);
-    const result = await onUpdateName(newName);
-    if (result?.success) {
-      showToast('이름이 변경되었습니다 ✅');
-      setIsEditingName(false);
-    } else {
-      showToast('이름 변경에 실패했습니다');
-    }
-    setIsSaving(false);
-  };
-
-  // =========================================================================
-  // 6. [DATA] — 목록 데이터
-  // =========================================================================
-  const myDecisions = decisions.filter(d => d.id !== 20001);
-  const participatedDecisions = decisions.filter(d => votedIds.includes(d.id));
+  // 이름 변경 가능 여부
+  const canChangeName = decisions.every(d => d.status === '마감' || d.isMock);
 
   // =========================================================================
   // 7. [RENDER]
   // =========================================================================
   return (
     <>
+      {/* 헤더 */}
       <header className="px-4 pt-3 pb-2 bg-white shrink-0 flex items-center gap-3 border-b border-gray-50">
         <button onClick={() => setView('home')} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">
           <ChevronLeft className="w-5 h-5 text-gray-600" />
@@ -111,188 +243,214 @@ const MyRoomView = ({ setView, decisions, votedIds, onSelectId, onDelete, showTo
       </header>
 
       <main className="flex-1 px-5 pb-24 overflow-y-auto bg-white">
-        {/* ============================================================= */}
-        {/* 프로필 + 이름 관리 */}
-        {/* ============================================================= */}
-        <div className="mt-4 mb-5 bg-gradient-to-br from-pink-50 to-orange-50 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">내 프로필</span>
-            {isPremium && (
-              <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">⭐ PREMIUM</span>
-            )}
+        <div className="py-4 space-y-4">
+
+          {/* ============================================================= */}
+          {/* 이름 & 페르소나 구역 */}
+          {/* ============================================================= */}
+          <div className="flex items-start gap-3">
+            {/* 이름 (왼쪽 60%) */}
+            <div className="w-[60%]">
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">내 프로필</p>
+              <p className="text-[22px] font-black text-gray-900 tracking-tight break-keep">{userName || '이름 없음'}</p>
+              {canChangeName ? (
+                <button onClick={() => {
+                  const newName = window.prompt('새 이름을 입력해주세요', userName);
+                  if (newName && newName.trim() && newName !== userName) {
+                    onUpdateName(newName.trim());
+                    showToast('이름이 변경되었습니다');
+                  }
+                }}
+                  className="mt-1 text-[10px] font-bold text-[#4A648A] flex items-center gap-1 hover:underline">
+                  ✏️ 변경
+                </button>
+              ) : (
+                <p className="mt-1 text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                  ⓘ 진행 중인 안건이 모두 완료된 후 변경할 수 있어요
+                </p>
+              )}
+            </div>
+
+            {/* 페르소나 (오른쪽 40%) — 자리 확보 */}
+            <div className="w-[40%] bg-[#FFF8F0] border border-[#FFE8D6] rounded-xl p-2.5 text-center">
+              <p className="text-[9px] font-black text-[#F4A067] uppercase tracking-wider mb-1">페르소나</p>
+              <p className="text-2xl mb-0.5">🎭</p>
+              <p className="text-[9px] font-bold text-gray-400">곧 만나요!</p>
+            </div>
           </div>
 
-          {isEditingName ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newName}
-                onChange={e => setNewName(e.target.value.slice(0, 20))}
-                placeholder="실명으로 입력해주세요"
-                maxLength={20}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-[14px] font-bold focus:outline-none focus:border-[#E8668A] focus:ring-2 focus:ring-[#E8668A]/20"
-                autoFocus
-              />
-              <button
-                onClick={handleNameSave}
-                disabled={isSaving}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-[#E8668A] text-white shrink-0"
+          {/* 점선 구분 */}
+          <div className="border-t-2 border-dashed border-gray-200" />
+
+          {/* ============================================================= */}
+          {/* 안건 서머리 구역 — 클릭 시 탭 이동 */}
+          {/* ============================================================= */}
+          <div className="grid grid-cols-4 gap-2">
+            {summaryData.map((item, i) => (
+              <button key={i} onClick={() => setActiveTab(item.tab)}
+                className={`flex flex-col items-center py-3 rounded-xl transition-all ${
+                  activeTab === item.tab
+                    ? 'bg-[#FFF0F3] border border-[#FCD9E1]'
+                    : 'bg-gray-50 border border-transparent hover:bg-gray-100'
+                }`}
               >
-                <Save className="w-4 h-4" />
+                <item.icon className={`w-4 h-4 mb-1 ${
+                  activeTab === item.tab ? 'text-[#E8668A]' : 'text-gray-400'
+                }`} />
+                <span className={`text-[18px] font-black ${
+                  activeTab === item.tab ? 'text-[#E8668A]' : 'text-gray-700'
+                }`}>
+                  {item.count}
+                </span>
+                <span className="text-[8px] font-bold text-gray-400 mt-0.5">{item.label}</span>
               </button>
-              <button
-                onClick={() => { setIsEditingName(false); setNewName(userName || ''); }}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 shrink-0"
+            ))}
+          </div>
+
+          {/* ============================================================= */}
+          {/* 탭 버튼 */}
+          {/* ============================================================= */}
+          <div className="flex gap-1 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {tabs.map((tab, i) => (
+              <button key={i} onClick={() => setActiveTab(i)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap transition-all ${
+                  activeTab === i
+                    ? i === 3
+                      ? 'bg-[#F0F7F0] text-[#4A8C5C] border border-[#C6E6C6]'
+                      : 'bg-[#FFF0F3] text-[#E8668A] border border-[#FCD9E1]'
+                    : 'bg-transparent text-gray-400'
+                }`}
               >
-                <X className="w-4 h-4" />
+                {tab}
               </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[16px] font-black text-gray-900">
-                  {userName || '이름을 설정해주세요'}
-                </p>
-                {!userName && (
-                  <p className="text-[10px] text-gray-400 mt-0.5">팀을 만들거나 참여하면 이름이 설정됩니다</p>
-                )}
-              </div>
-              {userName && (
-                <button
-                  onClick={() => {
-                    if (!nameChangeCheck.canChange) {
-                      showToast(nameChangeCheck.reason);
-                      return;
-                    }
-                    setNewName(userName);
-                    setIsEditingName(true);
-                  }}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
-                    nameChangeCheck.canChange
-                      ? 'text-[#E8668A] bg-white hover:bg-pink-50'
-                      : 'text-gray-300 bg-gray-50 cursor-not-allowed'
-                  }`}
-                >
-                  <Edit3 className="w-3 h-3" />
-                  변경
-                </button>
+            ))}
+          </div>
+
+          {/* ============================================================= */}
+          {/* 탭 0: 내가 만든 안건 */}
+          {/* ============================================================= */}
+          {activeTab === 0 && (
+            <div className="space-y-2">
+              {myCreatedAgendas.length > 0 ? (
+                <>
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">마감 임박 순</p>
+                  {myCreatedAgendas.map(a => (
+                    <AgendaTile key={a.id} agenda={a} onClick={() => onSelectId(a.id)}
+                      onDelete={onDelete} canDelete={true} isCompleted={false} />
+                  ))}
+                  <MostVotedOption agendas={myCreatedAgendas} />
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2 opacity-40">📋</p>
+                  <p className="text-[11px] font-bold text-gray-400">아직 만든 안건이 없어요</p>
+                </div>
               )}
             </div>
           )}
 
-          {!isEditingName && userName && !nameChangeCheck.canChange && (
-            <div className="flex items-center gap-1.5 mt-2 text-gray-400">
-              <AlertCircle className="w-3 h-3 shrink-0" />
-              <p className="text-[10px]">{nameChangeCheck.reason}</p>
+          {/* ============================================================= */}
+          {/* 탭 1: 내가 참여한 안건 */}
+          {/* ============================================================= */}
+          {activeTab === 1 && (
+            <div className="space-y-2">
+              {myJoinedAgendas.length > 0 ? (
+                <>
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">마감 임박 순</p>
+                  {myJoinedAgendas.map(a => (
+                    <AgendaTile key={a.id} agenda={a} onClick={() => onSelectId(a.id)}
+                      onDelete={onDelete} canDelete={false} isCompleted={false} />
+                  ))}
+                  <MostVotedOption agendas={myJoinedAgendas} />
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2 opacity-40">📋</p>
+                  <p className="text-[11px] font-bold text-gray-400">참여한 안건이 없어요</p>
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* ============================================================= */}
-        {/* 통계 카드 */}
-        {/* ============================================================= */}
-        <div className="grid grid-cols-2 gap-2.5 mb-5">
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <FileText className="w-4 h-4 text-[#E8668A] mx-auto mb-1" />
-            <p className="text-lg font-black text-gray-900">{stats.totalCreated}</p>
-            <p className="text-[10px] font-bold text-gray-400">만든 안건</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <Users className="w-4 h-4 text-[#5B8DEF] mx-auto mb-1" />
-            <p className="text-lg font-black text-gray-900">{stats.totalParticipated}</p>
-            <p className="text-[10px] font-bold text-gray-400">참여한 안건</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto mb-1" />
-            <p className="text-lg font-black text-gray-900">{stats.totalClosed}</p>
-            <p className="text-[10px] font-bold text-gray-400">완료된 안건</p>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-3 text-center">
-            <Trophy className="w-4 h-4 text-amber-500 mx-auto mb-1" />
-            <p className="text-lg font-black text-gray-900">{stats.resolutionRate}%</p>
-            <p className="text-[10px] font-bold text-gray-400">해결률</p>
-          </div>
-        </div>
-
-        {/* ============================================================= */}
-        {/* 내가 만든 안건 목록 */}
-        {/* ============================================================= */}
-        {myDecisions.length > 0 && (
-          <div className="mb-5">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">내가 만든 안건</h3>
+          {/* ============================================================= */}
+          {/* 탭 2: 완료된 안건 */}
+          {/* ============================================================= */}
+          {activeTab === 2 && (
             <div className="space-y-2">
-              {myDecisions.map(item => (
-                <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-3.5 shadow-sm transition-all">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="bg-pink-50 text-[#E8668A] text-[9px] font-black px-1.5 py-0.5 rounded uppercase">
-                      {item.status || '진행중'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <Clock className="w-3 h-3" />
-                        <span className="text-[10px] font-bold">{item.dDay}</span>
-                      </div>
-                      {!MOCK_IDS.includes(item.id) && (
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`"${item.title.substring(0,20)}..." 삭제하시겠습니까?`)) {
-                              onDelete(item.id);
-                            }
-                          }}
-                          className="w-6 h-6 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-400 rounded-lg transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div onClick={() => onSelectId(item.id)} className="cursor-pointer active:scale-[0.99]">
-                    <p className="text-[13px] font-black text-gray-800 mb-1 break-keep leading-tight">{item.title}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <Users className="w-3 h-3" />
-                        <span className="text-[10px] font-medium">{item.voters}명 참여</span>
-                      </div>
-                      <span className="text-[10px] text-[#8CB82D] font-black">
-                        {item.options?.length || 0}개 선택지
-                      </span>
-                    </div>
+              {completedAgendas.length > 0 ? (
+                completedAgendas.map(a => {
+                  const isMyAgenda = a.isMock || a.creator_id === userId;
+                  return (
+                    <AgendaTile key={a.id} agenda={a} onClick={() => onSelectId(a.id)}
+                      onDelete={onDelete} canDelete={isMyAgenda} isCompleted={true} />
+                  );
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2 opacity-40">✅</p>
+                  <p className="text-[11px] font-bold text-gray-400">완료된 안건이 없어요</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* 탭 3: Team */}
+          {/* ============================================================= */}
+          {activeTab === 3 && (
+            <div className="space-y-3">
+              {/* 내 팀 */}
+              {myCreatedTeams && myCreatedTeams.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-black text-[#C95374] uppercase tracking-wider mb-2">내 팀</p>
+                  <div className="space-y-2">
+                    {myCreatedTeams.map(t => (
+                      <TeamTile key={t.id} team={t} isOwner={true}
+                        onClick={() => onClickTeam(t.id)}
+                        onDelete={async (id) => {
+                          const result = await onDeleteTeam(id);
+                          if (result?.success) showToast('팀이 삭제되었습니다');
+                          else showToast('팀 삭제에 실패했습니다');
+                        }}
+                        onLeave={() => {}}
+                        showToast={showToast} />
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
 
-        {/* ============================================================= */}
-        {/* 내가 참여한 안건 목록 */}
-        {/* ============================================================= */}
-        {participatedDecisions.length > 0 && (
-          <div className="mb-5">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">내가 참여한 안건</h3>
-            <div className="space-y-2">
-              {participatedDecisions.map(item => (
-                <div key={item.id} onClick={() => onSelectId(item.id)}
-                  className="bg-white border border-gray-100 rounded-xl p-3.5 shadow-sm cursor-pointer active:scale-[0.99]">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="bg-blue-50 text-[#5B8DEF] text-[9px] font-black px-1.5 py-0.5 rounded uppercase">
-                      {item.status || '진행중'}
-                    </span>
-                    <div className="flex items-center gap-1 text-gray-400">
-                      <Clock className="w-3 h-3" />
-                      <span className="text-[10px] font-bold">{item.dDay}</span>
-                    </div>
-                  </div>
-                  <p className="text-[13px] font-black text-gray-800 mb-1 break-keep leading-tight">{item.title}</p>
-                  <div className="flex items-center gap-1 text-gray-400">
-                    <Users className="w-3 h-3" />
-                    <span className="text-[10px] font-medium">{item.voters}명 참여</span>
+              {/* 참여 팀 */}
+              {myJoinedTeams && myJoinedTeams.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-black text-[#4A6FA5] uppercase tracking-wider mb-2">참여 팀</p>
+                  <div className="space-y-2">
+                    {myJoinedTeams.map(t => (
+                      <TeamTile key={t.id} team={t} isOwner={false}
+                        onClick={() => onClickTeam(t.id)}
+                        onDelete={() => {}}
+                        onLeave={async (id) => {
+                          const result = await onLeaveTeam(id);
+                          if (result?.success) showToast('팀에서 탈퇴했습니다');
+                          else showToast('팀 탈퇴에 실패했습니다');
+                        }}
+                        showToast={showToast} />
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* 빈 상태 */}
+              {(!myCreatedTeams || myCreatedTeams.length === 0) && (!myJoinedTeams || myJoinedTeams.length === 0) && (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2 opacity-40">🏠</p>
+                  <p className="text-[11px] font-bold text-gray-400">소속된 팀이 없어요</p>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
+
+        </div>
       </main>
     </>
   );
