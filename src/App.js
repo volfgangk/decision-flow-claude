@@ -430,8 +430,14 @@ export default function App() {
           />
         )}
 
-        {engine.view === 'notifications' && (
-          <NotificationView setView={engine.setView} />
+{engine.view === 'notifications' && (
+          <NotificationView
+            setView={engine.setView}
+            decisions={agenda.allDecisions}
+            myCreatedTeams={team.myCreatedTeams}
+            myJoinedTeams={team.myJoinedTeams}
+            showToast={engine.showToast}
+          />
         )}
 
         {engine.view === 'settings' && (

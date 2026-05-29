@@ -1,157 +1,123 @@
-// ================================================
-// 📌 NotificationView.jsx — 알림 화면
-// 이 파일이 하는 일: 인앱 알림 센터
-// 수정할 일: 알림 화면 변경 시
-// ================================================
-
+// =========================================================================
+// 1. [IMPORTS]
+// =========================================================================
 import React, { useMemo } from 'react';
-import { ChevronLeft, Bell, Users, Clock, CheckCircle2, Zap, Trophy } from 'lucide-react';
-import TreeEngine from '../../utils/treeEngine';
+import {
+  ChevronLeft, FileText, Users, CheckCircle2,
+  TrendingUp, X, Bell
+} from 'lucide-react';
 
-const NotificationView = ({ setView, decisions, votedIds }) => {
+// =========================================================================
+// 2. [NOTIFICATION VIEW] — 알림 화면 (PDF 슬라이드 14)
+// =========================================================================
+const NotificationView = ({
+  setView, decisions, myCreatedTeams, myJoinedTeams, showToast
+}) => {
 
-  // 알림 목록 자동 생성
-  const notifications = useMemo(() => {
-    const list = [];
+  // =========================================================================
+  // 3. [SUMMARY DATA] — 서머리 4개 계산
+  // =========================================================================
+  const summaryData = useMemo(() => {
+    const activeAgendas = decisions.filter(d => d.status !== '마감' && !d.isMock);
+    const completedAgendas = decisions.filter(d => d.status === '마감' && !d.isMock);
+    const totalReal = activeAgendas.length + completedAgendas.length;
+    const progressRate = totalReal > 0
+      ? Math.round((completedAgendas.length / totalReal) * 100)
+      : 0;
 
-    decisions.forEach(d => {
-      const isMyDecision = d.id !== 20001;
-      const iParticipated = votedIds.includes(d.id);
-      const remaining = TreeEngine.getRemainingTime(d.deadline, d.dDay);
-      const isExpired = remaining === '⏳ 마감된 안건';
-
-      // 내가 만든 안건: 참여자 알림
-      if (isMyDecision && d.voters > 0) {
-        list.push({
-          id: `vote_${d.id}`,
-          icon: '🗳️',
-          color: 'text-[#E8668A]',
-          bg: 'bg-pink-50',
-          title: `"${d.title.substring(0, 20)}..."`,
-          body: `${d.voters}명이 투표에 참여했습니다. 고맙습니다! 🙏`,
-          time: '방금',
-          decisionId: d.id,
-        });
-      }
-
-      // 내가 만든 안건: 마감 임박
-      if (isMyDecision && !isExpired && d.dDay === 'D-1') {
-        list.push({
-          id: `deadline_${d.id}`,
-          icon: '⏰',
-          color: 'text-orange-500',
-          bg: 'bg-orange-50',
-          title: '마감 임박!',
-          body: `"${d.title.substring(0, 20)}..." 마감이 얼마 남지 않았습니다.`,
-          time: '1시간 전',
-          decisionId: d.id,
-        });
-      }
-
-      // 내가 참여한 안건: 완결 알림
-      if (iParticipated && isExpired) {
-        list.push({
-          id: `closed_${d.id}`,
-          icon: '✅',
-          color: 'text-[#8CB82D]',
-          bg: 'bg-[#FAFFEB]',
-          title: '안건이 완결되었습니다',
-          body: `"${d.title.substring(0, 20)}..."의 최종 결과를 확인해보세요.`,
-          time: '어제',
-          decisionId: d.id,
-        });
-      }
-    });
-
-    // 기본 알림 (알림이 없을 때 보여줄 예시)
-    if (list.length === 0) {
-      list.push({
-        id: 'welcome',
-        icon: '🎉',
+    return [
+      {
+        icon: FileText,
+        label: '새 투표\n시작 알림',
+        value: activeAgendas.length,
+        color: 'text-[#E8668A]',
+        bg: 'bg-[#FFF0F3]',
+      },
+      {
+        icon: Users,
+        label: '새 팀원\n참여 알림',
+        value: 0,
+        color: 'text-[#4A648A]',
+        bg: 'bg-[#EEF3FF]',
+      },
+      {
+        icon: CheckCircle2,
+        label: '안건\n마감 알림',
+        value: completedAgendas.length,
+        color: 'text-[#4A8C5C]',
+        bg: 'bg-[#F0F7F0]',
+      },
+      {
+        icon: TrendingUp,
+        label: '안건의\n진행률',
+        value: `${progressRate}%`,
         color: 'text-[#F4A067]',
-        bg: 'bg-orange-50',
-        title: 'Decision Flow에 오신 것을 환영합니다!',
-        body: '첫 안건을 만들어 팀원들과 함께 결정해보세요.',
-        time: '방금',
-        decisionId: null,
-      });
-    }
+        bg: 'bg-[#FFF8F0]',
+      },
+    ];
+  }, [decisions]);
 
-    return list;
-  }, [decisions, votedIds]);
-
+  // =========================================================================
+  // 4. [RENDER]
+  // =========================================================================
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <header className="px-4 py-4 bg-white border-b border-gray-100 flex items-center shrink-0">
-        <button onClick={() => setView('home')} className="p-2 hover:bg-gray-100 rounded-full">
-          <ChevronLeft />
+    <>
+      {/* 헤더 */}
+      <header className="px-4 pt-3 pb-2 bg-white shrink-0 flex items-center gap-3 border-b border-gray-50">
+        <button onClick={() => setView('home')} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
         </button>
-        <div className="flex-1 text-center">
-          <span className="text-[9px] font-black text-gray-400 tracking-[0.2em] block">NOTIFICATIONS</span>
-          <h1 className="font-black text-base text-gray-900">알림</h1>
-        </div>
-        <div className="w-9" />
+        <h1 className="text-[16px] font-black text-gray-900">알림</h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-32">
+      <main className="flex-1 px-5 pb-24 overflow-y-auto bg-white">
+        <div className="py-4 space-y-4">
 
-        {/* 알림 설정 안내 배너 */}
-        <div className="mx-5 mt-4 mb-4 bg-blue-50 border border-blue-100 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Bell className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-black text-blue-600">알림 설정</span>
-          </div>
-          <p className="text-[11px] text-blue-500 font-bold leading-relaxed">
-            알림 세부 설정은 <span className="underline cursor-pointer" onClick={() => setView('settings')}>설정 탭</span>에서 변경할 수 있습니다.
-          </p>
-        </div>
-
-        {/* 알림 목록 */}
-        <div className="px-5 space-y-3">
-          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
-            최근 알림 ({notifications.length})
-          </h3>
-
-          {notifications.map(noti => (
-            <div
-              key={noti.id}
-              onClick={() => noti.decisionId && setView('vote')}
-              className={`bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-start gap-3 ${noti.decisionId ? 'cursor-pointer active:scale-[0.99] transition-all' : ''}`}
-            >
-              <div className={`w-10 h-10 ${noti.bg} rounded-xl flex items-center justify-center text-xl shrink-0`}>
-                {noti.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-start gap-2">
-                  <p className={`text-[12px] font-black ${noti.color}`}>{noti.title}</p>
-                  <span className="text-[10px] text-gray-400 font-bold shrink-0">{noti.time}</span>
-                </div>
-                <p className="text-[12px] text-gray-600 font-medium mt-0.5 leading-relaxed">
-                  {noti.body}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* 예정 기능 안내 */}
-        <div className="mx-5 mt-6 bg-gray-100 rounded-2xl p-4">
-          <p className="text-[11px] font-black text-gray-400 mb-2">🔜 업데이트 예정</p>
-          <div className="space-y-1.5">
-            {[
-              '투표 마감 전 리마인드 알림',
-              '미참여자에게 알림 보내기 (방장 전용)',
-              '내 선택이 최종 결정될 때 알림',
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                <span className="text-[11px] text-gray-400 font-bold">{item}</span>
+          {/* ============================================================= */}
+          {/* 알림 서머리 구역 */}
+          {/* ============================================================= */}
+          <div className="grid grid-cols-4 gap-2">
+            {summaryData.map((item, i) => (
+              <div key={i}
+                className={`flex flex-col items-center py-3 rounded-xl ${item.bg} border border-transparent`}
+              >
+                <item.icon className={`w-4 h-4 mb-1.5 ${item.color}`} />
+                <span className={`text-[18px] font-black ${item.color}`}>
+                  {item.value}
+                </span>
+                <span className="text-[8px] font-bold text-gray-400 mt-1 text-center whitespace-pre-line leading-tight">
+                  {item.label}
+                </span>
               </div>
             ))}
           </div>
+
+          {/* ============================================================= */}
+          {/* 알림 리스트 구역 */}
+          {/* ============================================================= */}
+          <div className="relative">
+            {/* 전체 삭제 버튼 */}
+            <button
+              onClick={() => showToast('알림 기능이 곧 업데이트됩니다')}
+              className="absolute top-0 right-0 w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-50 text-red-300 hover:text-red-400 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="bg-[#F0F7F0] border border-[#C6E6C6] rounded-2xl p-6 min-h-[300px] flex flex-col items-center justify-center">
+              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+                <Bell className="w-6 h-6 text-gray-300" />
+              </div>
+              <p className="text-[13px] font-black text-gray-400 mb-1">알림이 없습니다</p>
+              <p className="text-[11px] font-bold text-gray-300 text-center leading-relaxed">
+                투표 시작, 팀원 참여, 안건 마감 시<br/>이곳에 알림이 표시됩니다.
+              </p>
+            </div>
+          </div>
+
         </div>
       </main>
-    </div>
+    </>
   );
 };
 
