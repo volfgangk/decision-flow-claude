@@ -261,9 +261,7 @@ const HomeView = ({
           ) : (
             <div className="bg-[#FFF0F3] rounded-2xl p-6 text-center">
               <p className="text-3xl mb-2 opacity-40">📋</p>
-              <p className="text-[11px] font-bold text-gray-400">
-                {agendaTab === 0 ? '아직 만든 안건이 없어요' : '참여한 안건이 없어요'}
-              </p>
+              <p className="text-[11px] font-bold text-gray-400">아래 버튼으로 첫 안건을 만들어보세요!</p>
             </div>
           )}
         </section>
@@ -303,9 +301,7 @@ const HomeView = ({
           ) : (
             <div className="bg-[#F0F7F0] rounded-2xl p-6 text-center">
               <p className="text-3xl mb-2 opacity-40">🏠</p>
-              <p className="text-[11px] font-bold text-gray-400">
-                {teamTab === 0 ? '팀을 만들면 안건을 공유할 수 있어요' : '참여한 팀이 없어요'}
-              </p>
+              <p className="text-[11px] font-bold text-gray-400">초대코드를 받았다면 팀에 참여해보세요!</p>
             </div>
           )}
 
@@ -314,6 +310,12 @@ const HomeView = ({
             <button onClick={onOpenCreateTeam}
               className="w-full mt-2 py-2.5 border-2 border-dashed border-[#C6E6C6] rounded-xl text-[11px] font-black text-[#8CB82D] hover:bg-[#F0F7F0] transition-all">
               + 새 팀 만들기
+            </button>
+          )}
+          {teamTab === 1 && (
+            <button onClick={onOpenJoinTeam}
+              className="w-full mt-2 py-2.5 border-2 border-dashed border-[#D2DFEE] rounded-xl text-[11px] font-black text-[#4A648A] hover:bg-[#EEF3FF] transition-all">
+              + 초대코드로 참여
             </button>
           )}
         </section>
